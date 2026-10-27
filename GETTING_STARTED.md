@@ -22,18 +22,31 @@ venv\Scripts\activate
 # macOS/Linux:
 source venv/bin/activate
 
-# Install dependencies (this downloads Gemma on first import)
+# Copy environment variables:
+# Windows:
+copy .env.example .env
+# macOS/Linux:
+cp .env.example .env
+
+# Install dependencies
 pip install -r requirements.txt
 
 # Start backend server
+# Windows (PowerShell):
+$env:PYTHONUTF8 = "1"; python -m app.main
+# macOS/Linux:
 python -m app.main
 ```
 
 **Expected output:**
 ```
-🚀 Loading model: google/gemma-1.1-2b-it
-...downloading model...
-✅ Model loaded successfully. Device: cuda
+[INFO] Loading model: TinyLlama/TinyLlama-1.1B-Chat-v1.0
+Loading TinyLlama/TinyLlama-1.1B-Chat-v1.0 on device: cpu
+Loading weights: 100%|█████████████████████████████████████████████████| 201/201
+Model loaded successfully. Device: cpu
+Model size: 1.10B parameters
+[INFO] Model loaded successfully
+INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8000
 ```
 
@@ -43,7 +56,7 @@ The backend is now running on `http://localhost:8000`
 Open another terminal and run:
 ```bash
 curl http://localhost:8000/health
-# Should return: {"status":"healthy","model_loaded":true,...}
+# Should return: {"status":"healthy","model_loaded":true,"device":"cpu","message":"Model is ready"}
 ```
 
 ### Step 2: Frontend Setup

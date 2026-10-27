@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.venv
+venv/
+ENV/
+env/
+
+# PyTest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.env.local
+npm-debug.log
+yarn-error.log
+
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
+
+# Model cache
+/models/
+backend/models/
+*.pt
+*.pth
+checkpoints/
+!backend/app/models/
+*.tsbuildinfo
+frontend/vite.config.d.ts
+frontend/vite.config.js
+
+# Experiment outputs
+experiments/
+runs/
+logs/
+
+# Environment
+.env
+.env.local

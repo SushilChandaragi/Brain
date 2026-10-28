@@ -74,3 +74,6 @@ logs/
 
 # Playwright & test artifacts
 .playwright-mcp/
+
+# Private local documentation (do not commit)
+PROJECT_EXPLANATION.md

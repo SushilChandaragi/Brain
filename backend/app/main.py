@@ -32,7 +32,11 @@ from app.schemas.inference import (
     NeuronNode,
     SynapseLink,
     ModelThinkingStep,
+    AuditPipelineRequest,
+    AuditPipelineResponse,
 )
+from app.services.audit_service import run_audit_pipeline
+
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -895,7 +899,40 @@ async def run_inference(request: InferenceRequest) -> InferenceResponse:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/audit/pipeline", response_model=AuditPipelineResponse)
+async def execute_audit_pipeline(request: AuditPipelineRequest) -> AuditPipelineResponse:
+    """Execute the full 6-stage AI Audit and Prompt Intelligence pipeline.
+    
+    Stages:
+    1. Input Analysis: Linguistic structure, intent, ambiguity, and risks.
+    2. Baseline Inference: Real model forward pass, predictive entropy, and generation.
+    3. Evidence Collection: Logit lens projections, tokens, and empirical measurements.
+    4. Robustness Testing: Controlled prompt variants executed against model.
+    5. Mechanistic Investigation: Identifying candidate causal layers and heads.
+    6. Synthesis & Recommendations: Evidence-driven improved prompt and answers to key audit questions.
+    """
+    if model_adapter is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+
+    raw_prompt = request.prompt.strip()
+    if not raw_prompt:
+        raise HTTPException(status_code=400, detail="Empty prompt provided for audit")
+
+    try:
+        response = await run_audit_pipeline(
+            request=request,
+            model_adapter=model_adapter,
+            model_name=settings.MODEL_NAME,
+        )
+        return response
+    except Exception as e:
+        print(f"[ERROR] Audit pipeline execution error: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Audit pipeline failed: {str(e)}")
+
+
 @app.post("/test-inference")
+
 async def test_inference():
     """Quick test endpoint to verify inference works."""
     if model_adapter is None:

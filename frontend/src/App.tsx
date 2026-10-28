@@ -19,6 +19,7 @@ import './App.css';
 import { Synaptic3DNeuralFlow } from './components/Synaptic3DNeuralFlow';
 import { AuditCaseSelector, AuditCase } from './components/AuditCaseSelector';
 import { ExecutiveAuditDossier } from './components/ExecutiveAuditDossier';
+import { AIAuditLab } from './components/AIAuditLab';
 
 export function ProbabilityBars({ predictions }: { predictions: TopKPrediction[] }) {
   const maxProbability = predictions[0]?.probability || 1;
@@ -112,11 +113,12 @@ function InteractiveAttentionMatrix({
                               ? '#f8fafc'
                               : `rgba(29, 101, 214, ${alpha})`,
                             color: isCausalMask
-                              ? '#cbd5e1'
+                              ? '#94a3b8'
                               : alpha > 0.45
                               ? '#ffffff'
-                              : '#1d65d6',
+                              : '#0f172a',
                           }}
+
                           onMouseEnter={() =>
                             setHoveredCell({
                               qToken: rowToken.token_str,
@@ -1372,7 +1374,7 @@ export function _SynapticNeuronFlowView({ initialPrompt }: { initialPrompt: stri
 }
 
 function App() {
-  const [appMode, setAppMode] = useState<'audit' | 'observatory'>('audit');
+  const [appMode, setAppMode] = useState<'audit-lab' | 'audit' | 'observatory'>('audit-lab');
   const [auditStep, setAuditStep] = useState<1 | 2 | 3 | 4>(1);
   const [circuitToolTab, setCircuitToolTab] = useState<'sweep' | 'patching' | 'matrix'>('sweep');
   const [observatoryTab, setObservatoryTab] = useState<'simulator' | 'history' | 'scanner'>('simulator');
@@ -1512,10 +1514,17 @@ function App() {
           <div className="mode-toggle-group">
             <button
               type="button"
+              className={`mode-toggle-btn ${appMode === 'audit-lab' ? 'active' : ''}`}
+              onClick={() => setAppMode('audit-lab')}
+            >
+              🧪 AI Audit Lab
+            </button>
+            <button
+              type="button"
               className={`mode-toggle-btn ${appMode === 'audit' ? 'active' : ''}`}
               onClick={() => setAppMode('audit')}
             >
-              🛡️ Forensic Audit Pipeline
+              🛡️ Forensic Pipeline (4 Phases)
             </button>
             <button
               type="button"
@@ -1525,6 +1534,7 @@ function App() {
               🔬 Research Observatory
             </button>
           </div>
+
 
           <div className={`connection-pill ${health?.model_loaded ? 'online' : ''}`}>
             <span /> {health?.model_loaded ? 'TINYLLAMA ONLINE' : 'CONNECTING'}
@@ -1597,8 +1607,22 @@ function App() {
           </div>
         )}
 
-        {/* -------------------- AUDIT MODE CONTENT -------------------- */}
+        {/* -------------------- AI AUDIT LAB MODE CONTENT -------------------- */}
+        {appMode === 'audit-lab' && (
+          <AIAuditLab
+            availableModelName={modelInfo?.model_name || 'TinyLlama-1.1B-Chat-v1.0'}
+            onNavigateToPhase={(phaseNum, promptToPass, targetToken) => {
+              setPrompt(promptToPass);
+              if (targetToken) setTargetHypothesis(targetToken);
+              setAuditStep(phaseNum);
+              setAppMode('audit');
+            }}
+          />
+        )}
+
+        {/* -------------------- FORENSIC PIPELINE 4-PHASE CONTENT -------------------- */}
         {appMode === 'audit' && (
+
           <>
             {auditStep === 1 && (
               <AuditCaseSelector

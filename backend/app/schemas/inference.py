@@ -198,3 +198,111 @@ class HealthResponse(BaseModel):
     model_loaded: bool
     device: Optional[str]
     message: str
+
+
+# ============================================================================
+# AI AUDIT LAB & PROMPT INTELLIGENCE SCHEMAS
+# ============================================================================
+
+class AuditPipelineRequest(BaseModel):
+    """Request for running the comprehensive AI Audit & Prompt Intelligence pipeline."""
+    prompt: str
+    objective: str = "factual_recall"  # factual_recall, hallucination_risk, ambiguity_detection, contradictory_instructions, context_distraction, bias_fairness, instruction_following, prompt_robustness, output_consistency, custom_hypothesis
+    expected_answer: Optional[str] = None
+    hypothesis: Optional[str] = None
+    run_robustness_variants: bool = True
+    max_new_tokens: int = 24
+    temperature: float = 0.0
+
+
+class PromptAnalysis(BaseModel):
+    """Stage 1: Linguistic and structural prompt breakdown."""
+    intended_task: str
+    explicit_requirements: List[str]
+    ambiguous_terms: List[str]
+    missing_context: List[str]
+    contradictions: List[str]
+    misleading_assumptions: List[str]
+    expected_format: str
+    reliability_concerns: List[str]
+    summary: str
+
+
+class AuditEvidenceItem(BaseModel):
+    """Stage 3: Evidence item with rigorous scientific provenance."""
+    evidence_id: str
+    category: str  # directly_measured, derived_metric, hypothesis_interpretation, externally_verified, unavailable
+    observation: str
+    source: str
+    method: str
+    confidence_or_uncertainty: Optional[str] = None
+    limitations: str
+    raw_data: Optional[Dict[str, Any]] = None
+
+
+class RobustnessVariantResult(BaseModel):
+    """Stage 4: Evaluation of a controlled prompt variation."""
+    variant_id: str
+    variant_type: str
+    prompt: str
+    rationale: str
+    top_token: str
+    top_probability: float
+    generated_text: str
+    consistent_with_baseline: bool
+    matches_expected: Optional[bool] = None
+    probability_shift: float
+
+
+class PromptQualityWeakness(BaseModel):
+    """Diagnosed prompt defect with causal evidence and suggested remediation."""
+    id: str
+    weakness_type: str
+    problematic_text: str
+    explanation: str
+    evidence: str
+    proposed_correction: str
+
+
+class MechanisticCandidate(BaseModel):
+    """Candidate transformer component for mechanistic deep-dive."""
+    component_type: str  # layer, attention_head, mlp
+    layer: int
+    head: Optional[int] = None
+    observation: str
+    hypothesis: str
+    suggested_action: str
+
+
+class AuditSynthesis(BaseModel):
+    """Stage 6: Multi-perspective synthesis answering key audit questions."""
+    original_behavior_summary: str
+    evidence_collected_count: int
+    directly_observed_issues: List[str]
+    empirically_supported_conclusions: List[str]
+    unverified_hypotheses: List[str]
+    discovered_weaknesses: List[str]
+    recommended_improvements: List[str]
+    recommended_followup_experiments: List[str]
+
+
+class AuditPipelineResponse(BaseModel):
+    """Comprehensive response from the AI Audit & Prompt Intelligence pipeline."""
+    run_id: str
+    timestamp: str
+    prompt: str
+    objective: str
+    expected_answer: Optional[str] = None
+    hypothesis: Optional[str] = None
+    model_info: Dict[str, Any]
+    analysis: PromptAnalysis
+    baseline_inference: Dict[str, Any]
+    evidence: List[AuditEvidenceItem]
+    robustness_variants: List[RobustnessVariantResult]
+    weaknesses: List[PromptQualityWeakness]
+    mechanistic_candidates: List[MechanisticCandidate]
+    synthesis: AuditSynthesis
+    improved_prompt: str
+    improved_prompt_explanation: str
+    execution_timeline: List[Dict[str, Any]]
+

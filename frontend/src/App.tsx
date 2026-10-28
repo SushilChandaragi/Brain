@@ -817,10 +817,6 @@ export function _SynapticNeuronFlowView({ initialPrompt }: { initialPrompt: stri
         </span>
       </div>
 
-      <p style={{ color: '#88bc91', fontSize: 13, lineHeight: 1.6, margin: '14px 0 16px', maxWidth: 900 }}>
-        Visualizes the authentic step-by-step thinking of the Transformer model for <em>any</em> query. Tokens flow from real prompt embeddings on the left, through active neuron channels in early, mid, and late checkpoints, into candidate vocabulary logits on the right. <strong>Tap any neuron</strong> to inspect its scalar activation, what vocabulary words it promotes/suppresses, and its causal contribution to the final answer.
-      </p>
-
       {/* Control row with prompt input & presets */}
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
         <input

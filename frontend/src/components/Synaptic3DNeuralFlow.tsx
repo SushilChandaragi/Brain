@@ -712,23 +712,6 @@ export const Synaptic3DNeuralFlow: React.FC<Synaptic3DNeuralFlowProps> = ({
 
   return (
     <div className="synaptic-3d-panel">
-      {/* Board Heading */}
-      <div className="board-heading" style={{ borderBottom: '1px solid var(--line, #d7d5cc)', paddingBottom: 14 }}>
-        <div>
-          <span className="section-number" style={{ color: 'var(--orange, #ff6846)' }}>09</span>
-          <h3 style={{ fontFamily: 'Space Grotesk', fontSize: 18 }}>
-            Synaptic 3D Neural Flow & Mechanistic Interpretability
-          </h3>
-        </div>
-        <span className="muted-label" style={{ color: 'var(--muted, #797c72)' }}>
-          3D SPATIAL PROPAGATION &bull; LIGHT MODE &bull; LOGIT LENS
-        </span>
-      </div>
-
-      <p style={{ color: 'var(--muted, #797c72)', fontSize: 14, lineHeight: 1.6, margin: '14px 0 16px', maxWidth: 940 }}>
-        Visualizes the authentic step-by-step thinking of the Transformer model in <strong>3D spatial perspective</strong> matching the website's clean editorial theme. Real prompt tokens flow from the left across hidden layers through <strong>light-grey curved synapses</strong> into candidate logits on the right. <strong>Click any node</strong> to illuminate its causal paths in <strong>electric yellow (<code>#FFD166</code>)</strong> and inspect its exact tensor values.
-      </p>
-
       {/* Query Bar */}
       <div className="synaptic-3d-input-bar">
         <input

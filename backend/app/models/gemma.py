@@ -25,14 +25,19 @@ class GemmaAdapter(ModelAdapter):
         self._active_intervention = None
     
     def load(self) -> None:
-        """Load Gemma model and tokenizer from HuggingFace."""
+        """Load model and tokenizer from HuggingFace."""
+        from app.config import settings
+        token = settings.HF_TOKEN if getattr(settings, 'HF_TOKEN', None) else None
         print(f"Loading {self.model_name} on device: {self.device}")
         
         # Load tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_name,
             trust_remote_code=True,
+            token=token,
         )
+        if self.tokenizer.pad_token_id is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
         
         # Load model with appropriate dtype
         dtype = torch.float32
@@ -43,6 +48,7 @@ class GemmaAdapter(ModelAdapter):
             self.model_name,
             torch_dtype=dtype,
             trust_remote_code=True,
+            token=token,
         )
 
         if hasattr(self.model, "set_attn_implementation"):

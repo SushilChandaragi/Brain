@@ -1377,11 +1377,13 @@ function App() {
   const [circuitToolTab, setCircuitToolTab] = useState<'sweep' | 'patching' | 'matrix'>('sweep');
   const [observatoryTab, setObservatoryTab] = useState<'simulator' | 'history' | 'scanner'>('simulator');
   const [targetHypothesis, setTargetHypothesis] = useState<string>(' Bangalore');
+  const [activeModelKey, setActiveModelKey] = useState<'tinyllama' | 'llama3.2'>('tinyllama');
+  const [switchingModel, setSwitchingModel] = useState(false);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null);
   const [layerCatalog, setLayerCatalog] = useState<LayerCatalog | null>(null);
   const [prompt, setPrompt] = useState('The capital of Karnataka is');
-  const [maxNewTokens, _setMaxNewTokens] = useState(24);
+  const [maxNewTokens, _setMaxNewTokens] = useState(40);
   const [temperature, _setTemperature] = useState(0.0);
   const [captureComponents, _setCaptureComponents] = useState(['hidden', 'attention', 'mlp', 'intermediate']);
   const [captureLayers, setCaptureLayers] = useState('');
@@ -1402,7 +1404,13 @@ function App() {
         const currentHealth = await apiClient.health();
         setHealth(currentHealth);
         if (currentHealth.model_loaded) {
-          setModelInfo(await apiClient.getModelInfo());
+          const info = await apiClient.getModelInfo();
+          setModelInfo(info);
+          if (info.model_name.toLowerCase().includes('3.2')) {
+            setActiveModelKey('llama3.2');
+          } else {
+            setActiveModelKey('tinyllama');
+          }
           setLayerCatalog(await apiClient.listLayers());
         }
       } catch (err) {
@@ -1410,9 +1418,37 @@ function App() {
       }
     };
     void checkHealth();
-    const interval = setInterval(checkHealth, 5000);
+    const interval = setInterval(checkHealth, 6000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleModelSwitch = async (modelKey: 'tinyllama' | 'llama3.2') => {
+    if (switchingModel || activeModelKey === modelKey) return;
+    setSwitchingModel(true);
+    setError(null);
+    try {
+      const newModelInfo = await apiClient.switchModel(modelKey);
+      setModelInfo(newModelInfo);
+      setActiveModelKey(modelKey);
+      const catalog = await apiClient.listLayers();
+      setLayerCatalog(catalog);
+      // Reset selected layer / head within bounds of new model architecture
+      if (catalog && selectedLayer >= catalog.layer_count) {
+        setSelectedLayer(0);
+      }
+      // Reset previous trace caches
+      setResult(null);
+      setTrace(null);
+      setSweepResult(null);
+      setExperiment(null);
+      // Immediately run baseline inference with newly loaded model
+      await runInference(prompt);
+    } catch (err: any) {
+      setError(`Failed to switch model: ${err.message || err}`);
+    } finally {
+      setSwitchingModel(false);
+    }
+  };
 
   const selectedCaptures = trace?.captures.filter((capture) => capture.layer === selectedLayer && capture.component !== 'logits') ?? [];
   const hasSelectedLayer = selectedCaptures.length > 0;
@@ -1509,6 +1545,36 @@ function App() {
         </div>
 
         <div className="topbar-controls">
+          {/* Model Architecture Toggle Switcher */}
+          <div className="model-switch-capsule" role="group" aria-label="Model Architecture Switcher">
+            <button
+              type="button"
+              className={`model-capsule-btn ${activeModelKey === 'tinyllama' ? 'active' : ''}`}
+              onClick={() => handleModelSwitch('tinyllama')}
+              disabled={switchingModel}
+              title="TinyLlama 1.1B • Ultra-fast mechanistic circuit tracing & ablation"
+            >
+              <span className="capsule-icon">🦙</span>
+              <div className="capsule-text">
+                <span className="capsule-title">TinyLlama 1.1B</span>
+                <span className="capsule-subtitle">Fast Trace</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              className={`model-capsule-btn ${activeModelKey === 'llama3.2' ? 'active' : ''}`}
+              onClick={() => handleModelSwitch('llama3.2')}
+              disabled={switchingModel}
+              title="Llama 3.2 (3B) • Meta high-reasoning conversational intelligence"
+            >
+              <span className="capsule-icon">⚡</span>
+              <div className="capsule-text">
+                <span className="capsule-title">Llama 3.2 (3B)</span>
+                <span className="capsule-subtitle">Deep Reasoning</span>
+              </div>
+            </button>
+          </div>
+
           <div className="mode-toggle-group">
             <button
               type="button"
@@ -1526,8 +1592,13 @@ function App() {
             </button>
           </div>
 
-          <div className={`connection-pill ${health?.model_loaded ? 'online' : ''}`}>
-            <span /> {health?.model_loaded ? 'TINYLLAMA ONLINE' : 'CONNECTING'}
+          <div className={`connection-pill ${health?.model_loaded ? 'online' : ''} ${switchingModel ? 'switching' : ''}`}>
+            <span className={switchingModel ? 'pulsing-dot' : ''} />
+            {switchingModel
+              ? 'SWITCHING ARCHITECTURE...'
+              : health?.model_loaded
+              ? `${activeModelKey === 'llama3.2' ? 'LLAMA 3.2 (3B)' : 'TINYLLAMA 1.1B'} ONLINE`
+              : 'CONNECTING'}
           </div>
         </div>
       </header>

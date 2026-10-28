@@ -1,6 +1,7 @@
 """FastAPI application for AI Brain Scanner."""
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+import gc
 import torch
 import traceback
 import uuid
@@ -12,6 +13,7 @@ from app.instrumentation import ActivationPatch, HeadAblation, MlpAblation, Trac
 from app.models.gemma import GemmaAdapter
 from app.storage import storage
 from app.schemas.inference import (
+    ModelSwitchRequest,
     InferenceRequest,
     InferenceResponse,
     ModelInfoResponse,
@@ -102,6 +104,134 @@ async def get_model_info() -> ModelInfoResponse:
     )
 
 
+AVAILABLE_MODELS = [
+    {
+        "key": "tinyllama",
+        "id": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+        "name": "TinyLlama 1.1B",
+        "short_name": "TinyLlama",
+        "badge": "1.1B Ultra-Fast",
+        "parameters": "1.1 Billion",
+        "vram": "~2.2 GB",
+        "description": "Ultra-lightweight Llama architecture for lightning-fast synaptic tracing and circuit ablations.",
+    },
+    {
+        "key": "llama3.2",
+        "id": "chuanli11/Llama-3.2-3B-Instruct-uncensored" if not getattr(settings, 'HF_TOKEN', None) else "meta-llama/Llama-3.2-3B-Instruct",
+        "fallback_id": "chuanli11/Llama-3.2-3B-Instruct-uncensored",
+        "name": "Llama 3.2 (3B)",
+        "short_name": "Llama 3.2",
+        "badge": "3.2B Smart Instruct",
+        "parameters": "3.21 Billion",
+        "vram": "~4.2 GB",
+        "description": "State-of-the-art Meta Llama 3.2 architecture with 128k vocabulary, deep reasoning, and full conversational output.",
+    },
+]
+
+
+@app.get("/model/available")
+async def get_available_models():
+    """List selectable model architectures."""
+    current_name = model_adapter.model_name if model_adapter else settings.MODEL_NAME
+    current_key = "tinyllama"
+    for m in AVAILABLE_MODELS:
+        if m["id"] == current_name or ("fallback_id" in m and m["fallback_id"] == current_name):
+            current_key = m["key"]
+            break
+
+    return {
+        "current_model": current_name,
+        "current_key": current_key,
+        "models": AVAILABLE_MODELS,
+    }
+
+
+@app.post("/model/switch", response_model=ModelInfoResponse)
+async def switch_model(request: ModelSwitchRequest) -> ModelInfoResponse:
+    """Switch active language model dynamically with memory cleanup."""
+    global model_adapter
+    target = request.model_name.strip()
+
+    # Resolve target key or id
+    resolved_id = None
+    for m in AVAILABLE_MODELS:
+        if target.lower() in [m["key"].lower(), m["name"].lower(), m["short_name"].lower(), m["id"].lower()]:
+            resolved_id = m["id"]
+            break
+        if "fallback_id" in m and target.lower() == m["fallback_id"].lower():
+            resolved_id = m["fallback_id"]
+            break
+
+    if not resolved_id:
+        resolved_id = target
+
+    if model_adapter is not None and model_adapter.model_name == resolved_id:
+        config = model_adapter.get_config()
+        return ModelInfoResponse(
+            model_name=config.model_name,
+            model_type=config.model_type,
+            device=config.device,
+            vocab_size=model_adapter.model.config.vocab_size,
+            num_parameters=sum(p.numel() for p in model_adapter.model.parameters()),
+            dtype=str(config.dtype),
+        )
+
+    print(f"[MODEL SWITCH] Unloading {settings.MODEL_NAME} and loading {resolved_id}...")
+
+    # Explicitly unload and free memory
+    if model_adapter is not None:
+        try:
+            del model_adapter.model
+            del model_adapter.tokenizer
+        except Exception:
+            pass
+        model_adapter = None
+
+    trace_store.clear()
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    try:
+        new_adapter = GemmaAdapter(model_name=resolved_id, device=settings.MODEL_DEVICE)
+        new_adapter.load()
+        model_adapter = new_adapter
+        settings.MODEL_NAME = resolved_id
+        print(f"[MODEL SWITCH] Successfully switched to {resolved_id}")
+    except Exception as e:
+        print(f"[ERROR] Failed to switch to {resolved_id}: {e}")
+        fallback = "chuanli11/Llama-3.2-3B-Instruct-uncensored"
+        if resolved_id != fallback and "llama" in resolved_id.lower():
+            print(f"[MODEL SWITCH] Falling back to open mirror {fallback}...")
+            try:
+                new_adapter = GemmaAdapter(model_name=fallback, device=settings.MODEL_DEVICE)
+                new_adapter.load()
+                model_adapter = new_adapter
+                settings.MODEL_NAME = fallback
+            except Exception as e2:
+                revert = GemmaAdapter(model_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0", device=settings.MODEL_DEVICE)
+                revert.load()
+                model_adapter = revert
+                settings.MODEL_NAME = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+                raise HTTPException(status_code=500, detail=f"Failed to load {resolved_id}: {e}; fallback error: {e2}")
+        else:
+            revert = GemmaAdapter(model_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0", device=settings.MODEL_DEVICE)
+            revert.load()
+            model_adapter = revert
+            settings.MODEL_NAME = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+            raise HTTPException(status_code=500, detail=f"Failed to load {resolved_id}: {e}")
+
+    config = model_adapter.get_config()
+    return ModelInfoResponse(
+        model_name=config.model_name,
+        model_type=config.model_type,
+        device=config.device,
+        vocab_size=model_adapter.model.config.vocab_size,
+        num_parameters=sum(p.numel() for p in model_adapter.model.parameters()),
+        dtype=str(config.dtype),
+    )
+
+
 @app.get("/model/architecture")
 async def get_model_architecture() -> dict:
     """Return named transformer modules discovered on the loaded model."""
@@ -109,7 +239,7 @@ async def get_model_architecture() -> dict:
         raise HTTPException(status_code=503, detail="Model not loaded")
     recorder = TraceRecorder(model_adapter.model, layer_indices=[])
     return {
-        "model": settings.MODEL_NAME,
+        "model": model_adapter.model_name if model_adapter else settings.MODEL_NAME,
         "layer_count": recorder.layer_count,
         "modules": recorder.architecture,
     }
@@ -791,8 +921,36 @@ async def run_inference(request: InferenceRequest) -> InferenceResponse:
         raise HTTPException(status_code=503, detail="Model not loaded")
     
     try:
+        # Determine whether to apply chat template for full conversational reasoning
+        prompt_text = request.prompt.strip()
+        already_templated = (
+            "<|user|>" in prompt_text or
+            "<|start_header_id|>" in prompt_text or
+            "<|im_start|>" in prompt_text
+        )
+
+        apply_chat = False
+        if request.use_chat_template is True and not already_templated:
+            apply_chat = True
+        elif request.use_chat_template is None and not already_templated:
+            lower_p = prompt_text.lower()
+            if prompt_text.endswith("?") or lower_p.startswith(("what", "why", "how", "who", "where", "explain", "describe", "tell me", "write", "can you", "summarize", "list", "hello", "hi")):
+                apply_chat = True
+
+        effective_prompt = prompt_text
+        if apply_chat and hasattr(model_adapter.tokenizer, "apply_chat_template"):
+            try:
+                effective_prompt = model_adapter.tokenizer.apply_chat_template(
+                    [{"role": "user", "content": prompt_text}],
+                    tokenize=False,
+                    add_generation_prompt=True,
+                )
+            except Exception as tmpl_err:
+                print(f"[WARN] Failed to apply chat template: {tmpl_err}")
+                effective_prompt = prompt_text
+
         # Tokenize input
-        tokens = model_adapter.tokenize(request.prompt)
+        tokens = model_adapter.tokenize(effective_prompt)
         input_ids = tokens["input_ids"]
         attention_mask = tokens.get("attention_mask")
         
@@ -843,6 +1001,12 @@ async def run_inference(request: InferenceRequest) -> InferenceResponse:
                 ))
             predictions.append(pos_predictions)
         
+        # Setup EOS token list for clean generation stopping across Llama architectures
+        eos_ids = [model_adapter.tokenizer.eos_token_id]
+        for extra_eos in [128001, 128009]:
+            if extra_eos not in eos_ids and extra_eos < model_adapter.model.config.vocab_size:
+                eos_ids.append(extra_eos)
+
         # Generate a continuation using the model's autoregressive loop.
         generation_kwargs = {
             "input_ids": input_ids,
@@ -850,7 +1014,8 @@ async def run_inference(request: InferenceRequest) -> InferenceResponse:
             "max_new_tokens": request.max_new_tokens,
             "do_sample": request.temperature > 0,
             "temperature": max(request.temperature, 1e-5),
-            "pad_token_id": model_adapter.tokenizer.eos_token_id,
+            "pad_token_id": model_adapter.tokenizer.pad_token_id or model_adapter.tokenizer.eos_token_id,
+            "eos_token_id": eos_ids if len(eos_ids) > 1 else eos_ids[0],
         }
         if request.top_k is not None:
             generation_kwargs["top_k"] = request.top_k
@@ -886,6 +1051,8 @@ async def run_inference(request: InferenceRequest) -> InferenceResponse:
                 "generated_length": len(generated_tokens),
                 "temperature": request.temperature,
                 "trace_id": trace["trace_id"],
+                "is_chat_formatted": apply_chat,
+                "effective_prompt": effective_prompt if apply_chat else None,
             },
         )
     

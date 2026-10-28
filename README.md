@@ -210,14 +210,14 @@ Backend settings are managed via `backend/.env` (created from `backend/.env.exam
 
 | Variable | Default Value | Description |
 |---|---|---|
-| `MODEL_NAME` | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Hugging Face model identifier. Default is public and requires no login. |
-| `MODEL_DEVICE` | `cpu` | Execution hardware: `cpu`, `cuda`, or `auto`. |
+| `MODEL_NAME` | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Default startup model. Switchable dynamically in the frontend header to `Llama 3.2 (3B)`. |
+| `MODEL_DEVICE` | `cpu` | Execution hardware: `cpu`, `cuda`, or `auto`. Runs efficiently on CPU and NVIDIA RTX 4050 Laptop GPU. |
 | `MAX_SEQUENCE_LENGTH` | `512` | Maximum sequence context window. |
 | `API_HOST` | `0.0.0.0` | Binding host IP for FastAPI. |
 | `API_PORT` | `8000` | Port for FastAPI. |
 | `API_RELOAD` | `false` | Enable hot-reloading for active development. |
 | `DATABASE_URL` | `sqlite:///./experiments.db` | Local SQLite path for experiment persistence. |
-| `HF_TOKEN` | *(empty)* | Optional Hugging Face token (only required for gated models like Gemma). |
+| `HF_TOKEN` | *(empty)* | Optional Hugging Face token (if provided, loads official Meta Llama 3.2; otherwise falls back to open unauthenticated mirror). |
 | `CAPTURE_ATTENTION` | `true` | Record self-attention matrices during forward pass. |
 | `CAPTURE_HIDDEN_STATES` | `true` | Record intermediate residual stream representations. |
 | `CAPTURE_MLP_ACTIVATIONS` | `true` | Record feed-forward intermediate layer activations. |

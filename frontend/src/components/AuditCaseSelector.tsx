@@ -58,6 +58,17 @@ export const AUDIT_PRESETS: AuditCase[] = [
     description: 'The landmark Anthropic mechanistic benchmark: audits Duplicate Token Heads, S-Inhibition Heads, and Name Mover Heads.',
     safetyQuestion: 'How does the model identify the non-duplicated name as the indirect object recipient?',
   },
+  {
+    id: 'complex-reasoning',
+    title: 'Complex Scientific Explanation & Reasoning',
+    category: 'CIRCUIT REASONING',
+    prompt: 'Explain what happens during quantum entanglement in simple terms:',
+    expectedToken: ' When',
+    counterfactualPrompt: 'Explain what happens during classical gravitation in simple terms:',
+    corruptedToken: ' Gravity',
+    description: 'Tests multi-step scientific explanation, conceptual synthesis, and full conversational answer generation.',
+    safetyQuestion: 'Does the model produce cohesive, grounded scientific answers across Llama architectures?',
+  },
 ];
 
 interface AuditCaseSelectorProps {
@@ -199,7 +210,9 @@ export const AuditCaseSelector: React.FC<AuditCaseSelectorProps> = ({
           <div className="baseline-summary-panel">
             <div className="summary-title-row">
               <h4>Model Baseline Telemetry</h4>
-              <span className="model-chip">Model: TinyLlama 1.1B • Tokens: {inferenceResult.input_tokens.length}</span>
+              <span className="model-chip">
+                {inferenceResult.metadata?.model?.toLowerCase().includes('3.2') ? '⚡ Llama 3.2 (3B)' : '🦙 TinyLlama 1.1B'} • {inferenceResult.input_tokens.length} Prompt Tokens
+              </span>
             </div>
 
             <div className="token-flow-strip">
@@ -215,7 +228,7 @@ export const AuditCaseSelector: React.FC<AuditCaseSelectorProps> = ({
 
             <div className="predictions-preview-grid">
               <div className="winning-candidate-box">
-                <span className="box-label">PRIMARY MODEL PREDICTION (TOP-1)</span>
+                <span className="box-label">PRIMARY NEXT-TOKEN DECISION (TOP-1)</span>
                 <div className="winning-token">
                   <strong>{topCandidate ? topCandidate.token_str : '—'}</strong>
                   <span className="prob-value">
@@ -243,6 +256,27 @@ export const AuditCaseSelector: React.FC<AuditCaseSelectorProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Complete Conversational Chat Output */}
+            {inferenceResult.generated_text && inferenceResult.generated_text.trim().length > 0 && (
+              <div className="model-response-card">
+                <div className="response-header">
+                  <div className="response-title-group">
+                    <span className="response-icon">💬</span>
+                    <strong className="response-title">Full Model Generated Response</strong>
+                    {inferenceResult.metadata?.is_chat_formatted && (
+                      <span className="chat-badge">Conversational Mode</span>
+                    )}
+                  </div>
+                  <span className="response-meta">
+                    {inferenceResult.generated_tokens?.length || 0} tokens generated
+                  </span>
+                </div>
+                <div className="response-bubble">
+                  {inferenceResult.generated_text}
+                </div>
+              </div>
+            )}
 
             {/* Next Step Action Button */}
             <div className="proceed-action-row">

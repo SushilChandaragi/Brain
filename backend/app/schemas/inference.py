@@ -20,15 +20,21 @@ class TopKPrediction(BaseModel):
     rank: int
 
 
+class ModelSwitchRequest(BaseModel):
+    """Request to switch active model."""
+    model_name: str
+
+
 class InferenceRequest(BaseModel):
     """Request for model inference."""
     prompt: str
-    max_new_tokens: int = 20
-    temperature: float = 1.0
+    max_new_tokens: int = 50
+    temperature: float = 0.7
     top_k: Optional[int] = None
     top_p: Optional[float] = None
     capture_layers: Optional[List[int]] = None
     capture_components: Optional[List[str]] = None
+    use_chat_template: Optional[bool] = None
 
 
 class InferenceResponse(BaseModel):

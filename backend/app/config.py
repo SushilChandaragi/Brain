@@ -1,4 +1,4 @@
-"""Application configuration."""
+from typing import Optional
 from pydantic_settings import BaseSettings
 
 
@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     MODEL_NAME: str = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"  # Public model, no auth needed
     MODEL_DEVICE: str = "cpu"  # "cuda", "cpu", or "auto"
     MAX_SEQUENCE_LENGTH: int = 512
+    HF_TOKEN: Optional[str] = None
     
     # API configuration
     API_HOST: str = "0.0.0.0"

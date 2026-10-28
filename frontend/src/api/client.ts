@@ -33,6 +33,24 @@ export interface ModelInfo {
   dtype: string;
 }
 
+export interface AvailableModel {
+  key: string;
+  id: string;
+  fallback_id?: string;
+  name: string;
+  short_name: string;
+  badge: string;
+  parameters: string;
+  vram: string;
+  description: string;
+}
+
+export interface AvailableModelsResponse {
+  current_model: string;
+  current_key: string;
+  models: AvailableModel[];
+}
+
 export interface HealthResponse {
   status: string;
   model_loaded: boolean;
@@ -205,9 +223,27 @@ class APIClient {
     return response.data;
   }
 
+  async getAvailableModels(): Promise<AvailableModelsResponse> {
+    const response = await this.client.get<AvailableModelsResponse>('/model/available');
+    return response.data;
+  }
+
+  async switchModel(modelName: string): Promise<ModelInfo> {
+    const response = await this.client.post<ModelInfo>('/model/switch', {
+      model_name: modelName,
+    });
+    return response.data;
+  }
+
   async runInference(
     prompt: string,
-    options: { maxNewTokens: number; temperature: number; captureLayers?: number[]; captureComponents?: string[] },
+    options: {
+      maxNewTokens: number;
+      temperature: number;
+      captureLayers?: number[];
+      captureComponents?: string[];
+      useChatTemplate?: boolean;
+    },
   ): Promise<InferenceResponse> {
     const response = await this.client.post<InferenceResponse>('/infer', {
       prompt,
@@ -215,6 +251,7 @@ class APIClient {
       temperature: options.temperature,
       capture_layers: options.captureLayers,
       capture_components: options.captureComponents,
+      use_chat_template: options.useChatTemplate,
     });
     return response.data;
   }

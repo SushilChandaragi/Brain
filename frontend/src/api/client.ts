@@ -319,6 +319,147 @@ class APIClient {
     });
     return response.data;
   }
+
+  async runAuditPipeline(request: AuditPipelineRequest): Promise<AuditPipelineResponse> {
+    const response = await this.client.post<AuditPipelineResponse>('/audit/pipeline', request);
+    return response.data;
+  }
 }
 
 export const apiClient = new APIClient();
+
+// ============================================================================
+// AI AUDIT LAB & PROMPT INTELLIGENCE TYPES
+// ============================================================================
+
+export interface AuditPipelineRequest {
+  prompt: string;
+  objective?: string;
+  expected_answer?: string;
+  hypothesis?: string;
+  run_robustness_variants?: boolean;
+  max_new_tokens?: number;
+  temperature?: number;
+}
+
+export interface PromptAnalysis {
+  intended_task: string;
+  explicit_requirements: string[];
+  ambiguous_terms: string[];
+  missing_context: string[];
+  contradictions: string[];
+  misleading_assumptions: string[];
+  expected_format: string;
+  reliability_concerns: string[];
+  summary: string;
+}
+
+export interface AuditEvidenceItem {
+  evidence_id: string;
+  category: 'directly_measured' | 'derived_metric' | 'hypothesis_interpretation' | 'externally_verified' | 'unavailable';
+  observation: string;
+  source: string;
+  method: string;
+  confidence_or_uncertainty?: string;
+  limitations: string;
+  raw_data?: Record<string, any>;
+}
+
+export interface RobustnessVariantResult {
+  variant_id: string;
+  variant_type: string;
+  prompt: string;
+  rationale: string;
+  top_token: string;
+  top_probability: number;
+  generated_text: string;
+  consistent_with_baseline: boolean;
+  matches_expected?: boolean | null;
+  probability_shift: number;
+}
+
+export interface PromptQualityWeakness {
+  id: string;
+  weakness_type: string;
+  problematic_text: string;
+  explanation: string;
+  evidence: string;
+  proposed_correction: string;
+}
+
+export interface MechanisticCandidate {
+  component_type: string;
+  layer: number;
+  head?: number;
+  observation: string;
+  hypothesis: string;
+  suggested_action: string;
+}
+
+export interface AuditSynthesis {
+  original_behavior_summary: string;
+  evidence_collected_count: number;
+  directly_observed_issues: string[];
+  empirically_supported_conclusions: string[];
+  unverified_hypotheses: string[];
+  discovered_weaknesses: string[];
+  recommended_improvements: string[];
+  recommended_followup_experiments: string[];
+}
+
+export interface AuditTimelineStage {
+  stage_index: number;
+  stage_name: string;
+  status: string;
+  timestamp: string;
+  details: string;
+}
+
+export interface AuditPipelineResponse {
+  run_id: string;
+  timestamp: string;
+  prompt: string;
+  objective: string;
+  expected_answer?: string;
+  hypothesis?: string;
+  model_info: {
+    model_name: string;
+    device: string;
+    total_layers: number;
+    vocab_size: number;
+  };
+  analysis: PromptAnalysis;
+  baseline_inference: {
+    model_identifier: string;
+    sequence_length: number;
+    input_tokens: TokenInfo[];
+    top_prediction: {
+      rank: number;
+      token_id: number;
+      token_str: string;
+      probability: number;
+      logit: number;
+    };
+    top_5_predictions: Array<{
+      rank: number;
+      token_id: number;
+      token_str: string;
+      probability: number;
+      logit: number;
+    }>;
+    predictive_entropy: number;
+    logit_margin_over_runner_up: number;
+    generated_text: string;
+    matches_expected?: boolean | null;
+    expected_token_stats?: Record<string, any>;
+    temperature: number;
+  };
+  evidence: AuditEvidenceItem[];
+  robustness_variants: RobustnessVariantResult[];
+  weaknesses: PromptQualityWeakness[];
+  mechanistic_candidates: MechanisticCandidate[];
+  synthesis: AuditSynthesis;
+  improved_prompt: string;
+  improved_prompt_explanation: string;
+  execution_timeline: AuditTimelineStage[];
+}

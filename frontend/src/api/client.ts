@@ -86,6 +86,101 @@ export interface HeadAblationExperiment {
   baseline: Record<string, any>;
   intervention_result: Record<string, any>;
   metrics: Record<string, any>;
+  created_at?: string;
+}
+
+export interface HeadScore {
+  layer: number;
+  head: number;
+  probability_drop: number;
+  target_logit_delta: number;
+}
+
+export interface HeadSweepResponse {
+  experiment_id: string;
+  prompt: string;
+  target_token: string;
+  target_token_id: number;
+  baseline_probability: number;
+  baseline_logit: number;
+  layers_evaluated: number[];
+  num_heads: number;
+  sensitivity_matrix: number[][];
+  top_causal_heads: HeadScore[];
+  created_at: string;
+}
+
+export interface ActivationPatchingResponse {
+  experiment_id: string;
+  clean_prompt: string;
+  corrupted_prompt: string;
+  target_layer: number;
+  component: string;
+  clean_target_token: string;
+  clean_target_id: number;
+  corrupted_prediction: string;
+  patched_prediction: string;
+  clean_logit: number;
+  corrupted_logit: number;
+  patched_logit: number;
+  clean_prob: number;
+  corrupted_prob: number;
+  patched_prob: number;
+  causal_recovery: number;
+  created_at: string;
+}
+
+export interface SynapseLink {
+  source_id: string;
+  target_id: string;
+  weight: number;
+  activity: number;
+}
+
+export interface NeuronNode {
+  id: string;
+  layer_idx: number;
+  layer_name: string;
+  neuron_idx: number;
+  channel_idx: number;
+  label: string;
+  activation: number;
+  normalized: number;
+  role: string;
+  details: Record<string, any>;
+}
+
+export interface ModelThinkingStep {
+  step_index: number;
+  stage_name: string;
+  layer_num: number;
+  top_hypothesized_token: string;
+  confidence: number;
+  description: string;
+}
+
+export interface NeuralGraphResponse {
+  prompt: string;
+  model: string;
+  columns: string[];
+  nodes: NeuronNode[];
+  links: SynapseLink[];
+  winner_node_id: string;
+  thinking_steps?: ModelThinkingStep[];
+  autoregressive_continuation?: string;
+  subword_explanation?: string;
+}
+
+export interface ExperimentListItem {
+  id: string;
+  experiment_type: string;
+  prompt: string;
+  model: string;
+  layer?: number;
+  head?: number;
+  target_token?: string;
+  metrics_summary?: string;
+  created_at: string;
 }
 
 class APIClient {
@@ -141,6 +236,50 @@ class APIClient {
 
   async runHeadAblation(prompt: string, layer: number, head: number): Promise<HeadAblationExperiment> {
     const response = await this.client.post<HeadAblationExperiment>('/experiments/head-ablation', { prompt, layer, head });
+    return response.data;
+  }
+
+  async runMlpAblation(prompt: string, layer: number): Promise<HeadAblationExperiment> {
+    const response = await this.client.post<HeadAblationExperiment>('/experiments/mlp-ablation', { prompt, layer });
+    return response.data;
+  }
+
+  async runHeadSweep(prompt: string, layers?: number[]): Promise<HeadSweepResponse> {
+    const response = await this.client.post<HeadSweepResponse>('/experiments/head-sweep', { prompt, layers });
+    return response.data;
+  }
+
+  async runActivationPatching(
+    clean_prompt: string,
+    corrupted_prompt: string,
+    target_layer: number,
+    component: string = 'hidden',
+  ): Promise<ActivationPatchingResponse> {
+    const response = await this.client.post<ActivationPatchingResponse>('/experiments/activation-patching', {
+      clean_prompt,
+      corrupted_prompt,
+      target_layer,
+      component,
+    });
+    return response.data;
+  }
+
+  async listExperiments(limit: number = 50, expType?: string): Promise<ExperimentListItem[]> {
+    const response = await this.client.get<ExperimentListItem[]>('/experiments', {
+      params: { limit, experiment_type: expType },
+    });
+    return response.data;
+  }
+
+  async deleteExperiment(experimentId: string): Promise<void> {
+    await this.client.delete(`/experiments/${experimentId}`);
+  }
+
+  async getNeuralGraph(prompt: string, numNeuronsPerColumn: number = 10): Promise<NeuralGraphResponse> {
+    const response = await this.client.post<NeuralGraphResponse>('/model/neural-graph', {
+      prompt,
+      num_neurons_per_column: numNeuronsPerColumn,
+    });
     return response.data;
   }
 }

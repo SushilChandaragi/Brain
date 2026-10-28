@@ -71,3 +71,6 @@ logs/
 # Environment
 .env
 .env.local
+
+# Playwright & test artifacts
+.playwright-mcp/

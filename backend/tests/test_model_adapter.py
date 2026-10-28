@@ -1,19 +1,20 @@
 """Tests for model adapter."""
 import pytest
 import torch
+from app.config import settings
 from app.models.gemma import GemmaAdapter
 
 
 @pytest.fixture
 def adapter():
     """Create a Gemma adapter instance."""
-    return GemmaAdapter(model_name="google/gemma-1.1-2b-it", device="cpu")
+    return GemmaAdapter(model_name=settings.MODEL_NAME, device=settings.MODEL_DEVICE)
 
 
 def test_adapter_initialization(adapter):
     """Test adapter can be initialized."""
     assert adapter is not None
-    assert adapter.model_name == "google/gemma-1.1-2b-it"
+    assert adapter.model_name == settings.MODEL_NAME
 
 
 def test_tokenization(adapter):
@@ -42,11 +43,11 @@ def test_decode(adapter):
     """Test decoding works."""
     adapter.load()
     
-    # Test with known token ID
-    token_id = torch.tensor([1])
-    decoded = adapter.decode(token_id)
+    # Test with known word tokens
+    tokens = adapter.tokenize("hello")
+    decoded = adapter.decode(tokens["input_ids"])
     assert isinstance(decoded, str)
-    assert len(decoded) > 0
+    assert "hello" in decoded.lower()
 
 
 if __name__ == "__main__":

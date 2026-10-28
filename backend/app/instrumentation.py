@@ -44,6 +44,110 @@ class HeadAblation:
             self.handle = None
 
 
+class MlpAblation:
+    """Temporarily zero out the MLP block contribution for one layer."""
+
+    def __init__(self, model: nn.Module, layer: int) -> None:
+        self.model = model
+        self.layer = layer
+        self.handle = None
+        self.path = None
+
+    def start(self) -> None:
+        down_suffix = f"layers.{self.layer}.mlp.down_proj"
+        mlp_suffix = f"layers.{self.layer}.mlp"
+        target_module = None
+        for path, module in self.model.named_modules():
+            if path.endswith(down_suffix):
+                self.path = path
+                target_module = module
+                break
+        if target_module is None:
+            for path, module in self.model.named_modules():
+                if path.endswith(mlp_suffix):
+                    self.path = path
+                    target_module = module
+                    break
+
+        if target_module is None:
+            raise ValueError(f"MLP module not found for layer {self.layer}")
+
+        def zero_output(_module: nn.Module, _args: tuple, output: Any):
+            if torch.is_tensor(output):
+                return torch.zeros_like(output)
+            elif isinstance(output, tuple):
+                return (torch.zeros_like(output[0]), *output[1:])
+            return output
+
+        self.handle = target_module.register_forward_hook(zero_output)
+
+    def stop(self) -> None:
+        if self.handle is not None:
+            self.handle.remove()
+            self.handle = None
+
+
+class ActivationPatch:
+    """Patch (replace) activations at a specific layer during forward pass."""
+
+    def __init__(
+        self,
+        model: nn.Module,
+        layer: int,
+        component: str,
+        clean_activation: torch.Tensor,
+        token_position: Optional[int] = None,
+    ) -> None:
+        self.model = model
+        self.layer = layer
+        self.component = component
+        self.clean_activation = clean_activation
+        self.token_position = token_position
+        self.handle = None
+        self.path = None
+
+    def start(self) -> None:
+        target_module = None
+        if self.component == "hidden":
+            suffix = f"layers.{self.layer}"
+        elif self.component == "mlp":
+            suffix = f"layers.{self.layer}.mlp"
+        else:
+            suffix = f"layers.{self.layer}.self_attn"
+
+        for path, module in self.model.named_modules():
+            if path.endswith(suffix):
+                self.path = path
+                target_module = module
+                break
+
+        if target_module is None:
+            raise ValueError(f"Module not found for layer {self.layer} component {self.component}")
+
+        def patch_hook(_module: nn.Module, _args: tuple, output: Any):
+            target_tensor = output[0] if isinstance(output, tuple) else output
+            patched = target_tensor.clone()
+            clean = self.clean_activation.to(patched.device, dtype=patched.dtype)
+
+            if self.token_position is not None and self.token_position < patched.shape[1]:
+                clean_pos = min(self.token_position, clean.shape[1] - 1)
+                patched[:, self.token_position, :] = clean[:, clean_pos, :]
+            else:
+                min_seq = min(patched.shape[1], clean.shape[1])
+                patched[:, -min_seq:, :] = clean[:, -min_seq:, :]
+
+            if isinstance(output, tuple):
+                return (patched, *output[1:])
+            return patched
+
+        self.handle = target_module.register_forward_hook(patch_hook)
+
+    def stop(self) -> None:
+        if self.handle is not None:
+            self.handle.remove()
+            self.handle = None
+
+
 class TraceRecorder:
     """Attach temporary hooks to selected transformer components."""
 

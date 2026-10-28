@@ -84,13 +84,14 @@ class GemmaAdapter(ModelAdapter):
         # Move to device
         return {k: v.to(self.device) for k, v in encoding.items()}
     
-    def decode(self, token_ids: torch.Tensor) -> str:
+    def decode(self, token_ids: Any) -> str:
         """Decode token IDs back to text."""
         if self.tokenizer is None:
             raise RuntimeError("Tokenizer not loaded. Call load() first.")
         
-        # Handle batch or single sequence
-        if token_ids.dim() > 1:
+        if isinstance(token_ids, int):
+            token_ids = [token_ids]
+        elif hasattr(token_ids, "dim") and token_ids.dim() > 1:
             token_ids = token_ids[0]
         
         return self.tokenizer.decode(token_ids, skip_special_tokens=True)

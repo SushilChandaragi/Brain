@@ -63,66 +63,114 @@ function InteractiveAttentionMatrix({
 
   return (
     <div className="interactive-matrix-wrap">
-      <div className="matrix-container">
-        <div className="matrix-header-row">
-          {displayTokens.map((t, idx) => (
-            <div className="matrix-header-cell" key={`col-${idx}`} title={`Key: "${t.token_str}" (#${idx})`}>
-              {t.token_str.trim() || '␣'}
-            </div>
-          ))}
-        </div>
-        {displayTokens.map((rowToken, rIdx) => {
-          const rowVals = matrixValues[rIdx] || [];
-          return (
-            <div className="matrix-grid-row" key={`row-${rIdx}`}>
-              <div className="matrix-row-label" title={`Query: "${rowToken.token_str}" (#${rIdx})`}>
-                {rowToken.token_str.trim() || '␣'}
-              </div>
-              {displayTokens.map((colToken, cIdx) => {
-                const weight = rowVals[cIdx] !== undefined ? rowVals[cIdx] : 0;
-                const alpha = Math.min(1, Math.max(0.04, Math.abs(weight)));
-                return (
-                  <div
-                    key={`cell-${rIdx}-${cIdx}`}
-                    className="matrix-cell"
-                    style={{
-                      backgroundColor: `rgba(29, 101, 214, ${alpha})`,
-                      color: alpha > 0.45 ? '#ffffff' : '#1d65d6',
-                    }}
-                    onMouseEnter={() =>
-                      setHoveredCell({
-                        qToken: rowToken.token_str,
-                        kToken: colToken.token_str,
-                        qIdx: rIdx,
-                        kIdx: cIdx,
-                        weight,
-                      })
-                    }
-                    onMouseLeave={() => setHoveredCell(null)}
-                  >
-                    {(weight * 100).toFixed(0)}%
+      <div className="matrix-table-card">
+        <div className="matrix-table-scroll">
+          <table className="attention-matrix-table">
+            <thead>
+              <tr>
+                <th className="matrix-corner-th">
+                  <div className="corner-guide">
+                    <span className="corner-query">Query ↓</span>
+                    <span className="corner-key">Key →</span>
                   </div>
+                </th>
+                {displayTokens.map((t, idx) => (
+                  <th
+                    key={`col-${idx}`}
+                    className={`matrix-col-th ${hoveredCell?.kIdx === idx ? 'col-highlighted' : ''}`}
+                  >
+                    <div className="col-header-box" title={`Key token #${idx}: "${t.token_str}"`}>
+                      <span className="col-idx">#{idx}</span>
+                      <span className="col-token">{t.token_str.trim() || '␣'}</span>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {displayTokens.map((rowToken, rIdx) => {
+                const rowVals = matrixValues[rIdx] || [];
+                return (
+                  <tr key={`row-${rIdx}`} className={hoveredCell?.qIdx === rIdx ? 'row-highlighted' : ''}>
+                    <th className={`matrix-row-th ${hoveredCell?.qIdx === rIdx ? 'row-highlighted' : ''}`}>
+                      <div className="row-header-box" title={`Query token #${rIdx}: "${rowToken.token_str}"`}>
+                        <span className="row-idx">#{rIdx}</span>
+                        <span className="row-token">{rowToken.token_str.trim() || '␣'}</span>
+                      </div>
+                    </th>
+                    {displayTokens.map((colToken, cIdx) => {
+                      const weight = rowVals[cIdx] !== undefined ? rowVals[cIdx] : 0;
+                      const alpha = Math.min(1, Math.max(0.04, Math.abs(weight)));
+                      const isHovered = hoveredCell?.qIdx === rIdx && hoveredCell?.kIdx === cIdx;
+                      const isCausalMask = cIdx > rIdx;
+                      return (
+                        <td
+                          key={`cell-${rIdx}-${cIdx}`}
+                          className={`matrix-cell-td ${isHovered ? 'cell-hovered' : ''} ${isCausalMask ? 'cell-causal-mask' : ''}`}
+                          style={{
+                            backgroundColor: isCausalMask
+                              ? '#f8fafc'
+                              : `rgba(29, 101, 214, ${alpha})`,
+                            color: isCausalMask
+                              ? '#cbd5e1'
+                              : alpha > 0.45
+                              ? '#ffffff'
+                              : '#1d65d6',
+                          }}
+                          onMouseEnter={() =>
+                            setHoveredCell({
+                              qToken: rowToken.token_str,
+                              kToken: colToken.token_str,
+                              qIdx: rIdx,
+                              kIdx: cIdx,
+                              weight,
+                            })
+                          }
+                          onMouseOver={() =>
+                            setHoveredCell({
+                              qToken: rowToken.token_str,
+                              kToken: colToken.token_str,
+                              qIdx: rIdx,
+                              kIdx: cIdx,
+                              weight,
+                            })
+                          }
+                          onMouseLeave={() => setHoveredCell(null)}
+                        >
+                          {isCausalMask ? '—' : `${(weight * 100).toFixed(0)}%`}
+                        </td>
+                      );
+                    })}
+                  </tr>
                 );
               })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="matrix-footer-bar">
+          {hoveredCell ? (
+            <div className="matrix-tooltip">
+              <div className="tooltip-cell-info">
+                <span className="tooltip-tag query">Query #{hoveredCell.qIdx}: <strong>"{hoveredCell.qToken}"</strong></span>
+                <span className="tooltip-arrow">➔</span>
+                <span className="tooltip-tag key">Key #{hoveredCell.kIdx}: <strong>"{hoveredCell.kToken}"</strong></span>
+              </div>
+              <div className="tooltip-weight-info">
+                <span>Attention Weight: <strong>{(hoveredCell.weight * 100).toFixed(2)}%</strong></span>
+                <span className="tooltip-sub">Layer {layerIndex} • Head {headIndex}</span>
+              </div>
             </div>
-          );
-        })}
-        {hoveredCell ? (
-          <div className="matrix-tooltip">
-            <span>
-              Query "{hoveredCell.qToken}" (pos {hoveredCell.qIdx}) ➔ Key "{hoveredCell.kToken}" (pos {hoveredCell.kIdx})
-            </span>
-            <strong>
-              Weight: {(hoveredCell.weight * 100).toFixed(2)}% | L{layerIndex} H{headIndex}
-            </strong>
-          </div>
-        ) : (
-          <div className="matrix-legend">
-            <span>LOW (0%)</span>
-            <div className="legend-bar" />
-            <span>HIGH (100%) — Hover any cell for token query/key pair</span>
-          </div>
-        )}
+          ) : (
+            <div className="matrix-legend">
+              <span className="legend-label">ATTENTION DENSITY:</span>
+              <span className="legend-step">0%</span>
+              <div className="legend-gradient-bar" />
+              <span className="legend-step">100%</span>
+              <span className="legend-hint">Hover any cell to inspect query ➔ key directional attention weight</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1691,7 +1739,10 @@ function App() {
                     {result && selectedCaptures.length > 0 ? (
                       <div className="trace-captures">
                         {selectedCaptures.map((capture) => (
-                          <div className="capture-card" key={`${capture.path}-${capture.component}`}>
+                          <div
+                            className={`capture-card ${capture.component === 'attention_weights' ? 'capture-card-matrix' : ''}`}
+                            key={`${capture.path}-${capture.component}`}
+                          >
                             <div>
                               <strong>{capture.component}</strong>
                               <span>{capture.path}</span>
@@ -1857,8 +1908,11 @@ function App() {
                     )}
 
                     <div className="trace-captures">
-                      {selectedCaptures.map((capture) => (
-                        <div className="capture-card" key={`${capture.path}-${capture.component}`}>
+                        {selectedCaptures.map((capture) => (
+                          <div
+                            className={`capture-card ${capture.component === 'attention_weights' ? 'capture-card-matrix' : ''}`}
+                            key={`${capture.path}-${capture.component}`}
+                          >
                           <div>
                             <strong>{capture.component}</strong>
                             <span>{capture.path}</span>
